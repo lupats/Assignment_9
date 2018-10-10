@@ -1,0 +1,14 @@
+---
+title: "Assignment 9"
+output: html_notebook
+---
+
+
+```{r}
+#Read data and load libraries------------------
+    data<-read.table("Northdale survey _reverse coded_.dat",
+                     header = TRUE,sep="\t")
+    library(pacman)
+    p_load(tidyverse, lavaan, psych)
+```
+
