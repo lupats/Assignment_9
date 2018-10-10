@@ -12,3 +12,157 @@ output: html_notebook
     p_load(tidyverse, lavaan, psych)
 ```
 
+Question 1
+```{r}
+
+ #making variables
+#   Threat
+    data$Thrt_Phy1<-data$Thrt_Phy1/3
+    data$Thrt_Phy2<-data$Thrt_Phy2/3
+    data$Thrt_Phy3<-data$Thrt_Phy3/3
+    data$threat_scale<-data$Thrt_Phy1+data$Thrt_Phy2+data$Thrt_Phy3
+#   Prejudice
+    data$Att_IS1<-(data$Att_IS1-1)/6.75    
+    data$Att_IS2<-(data$Att_IS2-1)/6.75  
+    data$Att_IS4<-(data$Att_IS4-1)/6.75  
+    data$prejudice_scale<-(data$Att_IS1 + data$Att_IS2 + data$Att_IS4)
+#   Contact quantity
+    data$Cnt_pos_B<-data$Cnt_pos_B/2
+    data$Cnt_pos_IS1<-data$Cnt_pos_IS1/2
+    data$contactquant_scale<-data$Cnt_pos_B+data$Cnt_pos_IS1
+#   Contact_quality
+    data$Cnt_Qul_IS1<-data$Cnt_Qul_IS1/3
+    data$Cnt_Qul_IS2<-data$Cnt_Qul_IS2/3
+    data$Cnt_Qul_IS3<-data$Cnt_Qul_IS3/3
+    data$contactqual_scale<-data$Cnt_Qul_IS1+data$Cnt_Qul_IS2+data$Cnt_Qul_IS3
+#   Empathy
+    data$Empath1<-data$Empath1/3    
+    data$Empath2<-data$Empath2/3
+    data$Empath3<-data$Empath3/3
+    data$empathy_scale<-(data$Empath1 + data$Empath2 + data$Empath3)
+    
+```
+```{r}
+#Define path model-------
+pathm1 <- '
+      threat_scale ~ empathy_scale
+      prejudice_scale ~ threat_scale + empathy_scale
+      
+'    
+prejpathfit1 <- sem(pathm1, data = data)
+summary(prejpathfit1, fit.measures = T)   
+
+# Compare lm output-----------
+# To make things comparable, keep only complete cases
+data_p <- data  %<>%
+  select(empathy_scale, prejudice_scale, threat_scale) %>% 
+  na.omit()
+# First compute first step regression
+lm_model_pathm1_A <- lm(prejudice_scale ~ empathy_scale, data = data_p)
+summary(lm_model_pathm1_A)
+# Now model prejudice
+lm_model_pathm1_B <- lm(prejudice_scale ~ threat_scale, data = data_p)
+summary(lm_model_pathm1_B)
+```
+```{r}
+#since we cannot interpret much form the RMSEA (0.000) and its p-value (NA) let's run a CFA on the model 
+#   Oblique
+    prejcfamodel1 <- '
+                  # loadings
+                  threat_scale       =~ Thrt_Phy1 + Thrt_Phy2 + Thrt_Phy3
+                  empathy_scale      =~ Empath1 + Empath2 + Empath3
+                  prejudice_scale    =~ Att_IS1 + Att_IS2 + Att_IS4
+                  '
+    prejcfacfa1 <- cfa(prejcfamodel1, data = data)
+    summary(prejcfacfa1, fit.measures = T)
+    #although our CFA is suggesting a good fit here, the RMSEA and its pvalue suggest otherwise 
+# Now Drawing  model using package semPlot------------
+p_load(semPlot)
+semPlot::semPaths(prejpathfit1, what = "est", layout = "spring")
+```
+
+```{r}
+#SEM of model1
+      prejpathmodel1 <- '
+      # MEASUREMENT MODEL
+      threat_scale       =~ Thrt_Phy1 + Thrt_Phy2 + Thrt_Phy3
+      prejudice_scale    =~ Att_IS1 + Att_IS2 + Att_IS4
+      empathy_scale      =~ Empath1 + Empath2 + Empath3
+      
+      # STRUCTURAL MODEL
+      prejudice_scale ~ threat_scale + empathy_scale 
+      threat_scale ~ prejudice_scale 
+      empathy_scale ~ prejudice_scale
+      
+      
+      # CORRELATED ERRORS
+      # Att_IS1 ~~ Cnt_pos_B
+      # Att_IS2 ~~ Cnt_pos_B
+      # Att_IS4 ~~ Cnt_pos_B
+      # Att_IS1 ~~ Cnt_pos_IS1
+      # Att_IS2 ~~ Cnt_pos_IS1
+      # Att_IS4 ~~ Cnt_pos_IS1
+      
+      '
+      prejpathfit1 <- sem(prejpathmodel1, data = data) 
+      summary(prejpathfit1, fit.measures = T)
+      
+      # Take a look at residuals and modification indices
+      modificationindices(prejpathfit1, sort. = TRUE)
+      resid(prejpathfit1, type="normalized")
+```
+```{r}
+#let's look at quantified effects
+# STRUCTURAL MODEL
+model <- " #a path
+            prejudice_scale ~ a*threat_scale
+
+           #b path
+            threat_scale    ~ b*empathy_scale
+
+           #c path
+            prejudice_scale ~ threat_scale*empathy_scale       
+           
+           #Indirect and total effects
+            indirect       := a*b
+            total := cp + ab
+
+"
+```
+
+```{r}
+#Now bootstrapping
+set.seed(500)
+fsem1 <- sem(model, data = data, se = "bootstrap", bootstrap = 1000)#not working might have to do with the structrual model above
+```
+
+Question 2
+
+```{r}
+#Define path model 
+pathmod1 <- '
+      threat_scale ~ contactquant_scale
+      prejudice_scale ~ threat_scale +contactquant_scale
+
+'
+prejpathfitmod1 <- sem(pathmod1, data = data)
+summary(prejpathfitmod1, fit.measures = T)  
+semPaths(prejpathfitmod1, what = "est", layout = "spring")
+
+```
+```{r}
+pathmod2 <- '
+      threat_scale ~ contactquant_scale
+      prejudice_scale ~ threat_scale + contactqual_scale + contactquant_scale 
+'
+prejpathfitmod2 <- sem(pathmod2, data = data)
+summary(prejpathfitmod2, fit.measures = T)
+semPaths(prejpathfitmod2, what = "est", layout = "spring")
+```
+```{r}
+#MODEL 2's RMSEA is > 0.5 so it's siginificant, also confirmed by pvalue = 0.005 (<0.05). We do not have RMSEA for the first model which makes it difficult to make a comparison, let's rather do anova
+
+anova(prejpathfitmod2, prejpathfitmod1)
+#this seems to favour model 2
+```
+
